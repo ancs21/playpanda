@@ -3,7 +3,7 @@ name: playpanda
 description: Fetch any URL and convert to clean markdown for LLM consumption. Use when the user asks to "fetch a page", "get content from URL", "scrape this website", "convert to markdown", "read this article", or needs web content as context. Supports authenticated sites (Facebook, Medium, etc.) via stealth browser.
 metadata:
   author: ancs21
-  version: "0.0.2"
+  version: "0.0.3"
 ---
 
 # PlayPanda — Web to Markdown for LLMs

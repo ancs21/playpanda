@@ -2,7 +2,7 @@ const std = @import("std");
 const browser = @import("browser.zig");
 const auth = @import("auth.zig");
 
-const version = "0.0.2";
+const version = "0.0.3";
 
 const usage =
     \\Usage: playpanda <command>
