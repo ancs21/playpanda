@@ -68,6 +68,12 @@ The installer handles these automatically, or install manually:
 - Python 3 + `websockets` — Tier 3 stealth browser and cookie harvesting
 - Chrome/Chromium — for Tier 3 stealth and login flow
 
+## Use as Agent Skill
+
+```
+npx skills add ancs21/playpanda
+```
+
 ## Usage
 
 ### Fetch a page
@@ -110,12 +116,6 @@ These domains automatically use Tier 3 (stealth browser):
 facebook.com, instagram.com, linkedin.com, x.com, twitter.com, medium.com, google.com, youtube.com, tiktok.com, reddit.com, substack.com, threads.net, pinterest.com
 
 Other sites start at Tier 1 and escalate if blocked.
-
-## Use as Agent Skill
-
-```
-npx skills add ancs21/playpanda
-```
 
 ## License
 
