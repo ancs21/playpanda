@@ -57,12 +57,25 @@ pub fn loginFlow(allocator: std.mem.Allocator) !void {
         break;
     }
 
-    // Wait for user to press Enter
+    // Wait for user to press Enter (DON'T close the browser before this!)
+    std.debug.print("Press Enter when done (keep the browser open!)...\n", .{});
     const stdin_file = std.fs.File{ .handle = std.posix.STDIN_FILENO };
     var buf: [64]u8 = undefined;
     _ = stdin_file.read(&buf) catch {};
 
-    // Harvest cookies via CDP
+    // Check if browser is still running
+    {
+        const address = std.net.Address.parseIp4("127.0.0.1", login_port) catch {
+            std.debug.print("Browser closed before cookies could be saved. Run again and keep browser open.\n", .{});
+            return AuthError.HarvestFailed;
+        };
+        const stream = std.net.tcpConnectToAddress(address) catch {
+            std.debug.print("Browser closed before cookies could be saved. Run again and keep browser open.\n", .{});
+            return AuthError.HarvestFailed;
+        };
+        stream.close();
+    }
+
     std.debug.print("Harvesting cookies...\n", .{});
 
     // Harvest cookies via Python helper (CDP in Zig hits Chrome 146 event flood issues)
