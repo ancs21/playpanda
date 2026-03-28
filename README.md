@@ -106,6 +106,12 @@ facebook.com, instagram.com, linkedin.com, x.com, twitter.com, medium.com, googl
 
 Other sites start at Tier 1 and escalate if blocked.
 
+## Use as Agent Skill
+
+```
+npx skills add ancs21/playpanda
+```
+
 ## License
 
 [Apache 2.0](LICENSE)
