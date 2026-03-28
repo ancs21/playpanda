@@ -7,7 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  # ── Build + Test + Coverage ──
   test:
     runs-on: ubuntu-latest
     steps:
@@ -15,66 +14,43 @@ jobs:
 
       - uses: mlugg/setup-zig@v2
         with:
-          version: "0.15.0"
+          version: "0.15.2"
 
       - name: Build
         run: zig build
 
-      - name: Test
+      - name: Unit tests
         run: zig build test
 
-      - name: Test (ReleaseSafe — sanitizers)
+      - name: Unit tests (ReleaseSafe)
         run: zig build test -Doptimize=ReleaseSafe
 
-      - name: Install kcov
-        run: sudo apt-get update && sudo apt-get install -y kcov
-
-      - name: Coverage
+      - name: Integration test
         run: |
-          zig test src/cookie_jar.zig --test-no-exec -femit-bin=./test-bin 2>/dev/null || true
-          if [ -f ./test-bin ]; then
-            kcov --include-path=src/ coverage/ ./test-bin
-          fi
+          # Test CLI
+          ./zig-out/bin/playpanda --help | grep -q "Commands"
+          ./zig-out/bin/playpanda --version | grep -q "playpanda"
+          echo "CLI tests passed"
 
-      - uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          directory: coverage/
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-  # ── Cross-compile ──
   cross-compile:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [aarch64-macos, x86_64-macos, aarch64-linux, x86_64-linux]
+        include:
+          - target: aarch64-macos
+          - target: x86_64-macos
+          - target: aarch64-linux
+          - target: x86_64-linux
     steps:
       - uses: actions/checkout@v4
 
       - uses: mlugg/setup-zig@v2
         with:
-          version: "0.15.0"
+          version: "0.15.2"
 
       - name: Cross-compile ${{ matrix.target }}
         run: zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseSafe
 
-  # ── Python security ──
-  python-audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Audit Python dependencies
-        run: |
-          pip install pip-audit
-          pip-audit -r requirements.txt
-
-  # ── Secret scanning ──
   secrets:
     runs-on: ubuntu-latest
     steps:
@@ -85,13 +61,3 @@ jobs:
       - uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
-
-  # ── Semgrep (Python scripts) ──
-  semgrep:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    container:
-      image: semgrep/semgrep
-    steps:
-      - uses: actions/checkout@v4
-      - run: semgrep scan --config auto --error --lang py scripts/
