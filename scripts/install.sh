@@ -74,7 +74,7 @@ echo ""
 # --- 2. Download helper scripts ---
 echo "[2/4] Installing scripts..."
 mkdir -p "$SCRIPTS_DIR"
-for script in html2md.py clean_md.py fetch_page.py harvest_cookies.py ua_proxy.py; do
+for script in fetch_page.py harvest_cookies.py; do
   download "$BASE_URL/scripts/$script" "$SCRIPTS_DIR/$script" 2>/dev/null && \
     echo "  $script" || echo "  $script (skipped)"
 done
@@ -157,5 +157,5 @@ esac
 
 echo "Done! Get started:"
 echo "  playpanda https://example.com"
-echo "  playpanda login https://medium.com"
+echo "  playpanda profile"
 echo "  playpanda --help"
