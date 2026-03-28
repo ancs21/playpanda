@@ -373,6 +373,9 @@ fn decodeEntity(s: []const u8) ?Entity {
     return null;
 }
 
+/// Post-process markdown for LLM consumption.
+/// Strips long image URLs, tracking links, collapses whitespace.
+/// Works on output from all tiers (HTML convert, Lightpanda, CloakBrowser).
 pub fn postProcess(allocator: std.mem.Allocator, raw: []const u8) ![]const u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
@@ -382,27 +385,131 @@ pub fn postProcess(allocator: std.mem.Allocator, raw: []const u8) ![]const u8 {
     var line_start = true;
     var i: usize = 0;
 
-    while (i < raw.len) : (i += 1) {
+    while (i < raw.len) {
+        // Strip ![...](long-url) — images with URLs > 100 chars
+        if (i + 2 < raw.len and raw[i] == '!' and raw[i + 1] == '[') {
+            const img_end = findImageEnd(raw[i..]);
+            if (img_end) |end| {
+                const img = raw[i .. i + end];
+                // Extract alt text between ![ and ]
+                if (std.mem.indexOf(u8, img, "](")) |paren_start| {
+                    const alt = img[2..paren_start];
+                    const url_start = paren_start + 2;
+                    const url_end = img.len - 1; // before )
+                    const url = img[url_start..url_end];
+
+                    if (url.len > 100 or isDataUri(url)) {
+                        // Replace with alt text only
+                        if (alt.len > 0) {
+                            try w.writeAll("[image: ");
+                            try w.writeAll(alt);
+                            try w.writeByte(']');
+                        }
+                        i += end;
+                        newline_count = 0;
+                        line_start = false;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Strip [text](tracking-url) — links with tracking params
+        if (raw[i] == '[' and (i == 0 or raw[i - 1] != '!')) {
+            const link_end = findLinkEnd(raw[i..]);
+            if (link_end) |end| {
+                const link = raw[i .. i + end];
+                if (std.mem.indexOf(u8, link, "](")) |paren_start| {
+                    const text = link[1..paren_start];
+                    const url_start = paren_start + 2;
+                    const url_end = link.len - 1;
+                    const url = link[url_start..url_end];
+
+                    if (isTrackingUrl(url) or url.len > 200) {
+                        // Keep text, strip URL
+                        try w.writeAll(text);
+                        i += end;
+                        newline_count = 0;
+                        line_start = false;
+                        continue;
+                    }
+                }
+            }
+        }
+
         if (raw[i] == '\n') {
             newline_count += 1;
             if (newline_count <= 2) {
                 try w.writeByte('\n');
             }
             line_start = true;
+            i += 1;
             continue;
         }
 
-        if (raw[i] != '\n') {
-            // Strip leading whitespace on lines
-            if (line_start and (raw[i] == ' ' or raw[i] == '\t')) continue;
-            newline_count = 0;
-            line_start = false;
+        // Strip leading whitespace on lines
+        if (line_start and (raw[i] == ' ' or raw[i] == '\t')) {
+            i += 1;
+            continue;
         }
+        newline_count = 0;
+        line_start = false;
 
         try w.writeByte(raw[i]);
+        i += 1;
     }
 
     return try out.toOwnedSlice(allocator);
+}
+
+/// Find the end of ![alt](url) starting at pos.
+fn findImageEnd(s: []const u8) ?usize {
+    if (s.len < 5 or s[0] != '!' or s[1] != '[') return null;
+    var depth: u32 = 0;
+    var i: usize = 1;
+    // Find matching ]
+    while (i < s.len) : (i += 1) {
+        if (s[i] == '[') depth += 1;
+        if (s[i] == ']') {
+            if (depth == 1) break;
+            depth -= 1;
+        }
+    }
+    if (i >= s.len or s[i] != ']') return null;
+    // Expect (
+    i += 1;
+    if (i >= s.len or s[i] != '(') return null;
+    // Find matching )
+    var paren_depth: u32 = 1;
+    i += 1;
+    while (i < s.len) : (i += 1) {
+        if (s[i] == '(') paren_depth += 1;
+        if (s[i] == ')') {
+            paren_depth -= 1;
+            if (paren_depth == 0) return i + 1;
+        }
+    }
+    return null;
+}
+
+/// Find the end of [text](url) starting at pos.
+fn findLinkEnd(s: []const u8) ?usize {
+    if (s.len < 4 or s[0] != '[') return null;
+    // Find matching ]
+    var i: usize = 1;
+    while (i < s.len and s[i] != ']') : (i += 1) {
+        if (s[i] == '\n') return null; // No multiline links
+    }
+    if (i >= s.len or s[i] != ']') return null;
+    i += 1;
+    if (i >= s.len or s[i] != '(') return null;
+    // Find matching )
+    i += 1;
+    while (i < s.len and s[i] != ')') : (i += 1) {
+        if (s[i] == '\n') return null;
+    }
+    if (i >= s.len) return null;
+    return i + 1;
 }
 
 // ── Tests ──
